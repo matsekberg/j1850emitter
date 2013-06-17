@@ -1,5 +1,5 @@
 //
-// J1850 emitter, v1.2
+// J1850 emitter, v1.3
 // Mats Ekberg (c) 2013
 // 
 // This software simulates a data stream from a J1850 compliant 
@@ -57,7 +57,7 @@ void setup(void)
   digitalWrite(LED_PIN, LOW);
 
   Serial.begin(115200);
-  Serial.println(F("j1850emitter/v1.2"));
+  Serial.println(F("j1850emitter/v1.3"));
 
 
 
@@ -91,7 +91,6 @@ void sendEOF()
 {
   digitalWrite(J1850_PIN, LOW);
   delayMicroseconds(EOF_TIME);
-  Serial.println();
 }
 
 void sendMessage(uint8_t* message, uint8_t length) 
@@ -99,38 +98,52 @@ void sendMessage(uint8_t* message, uint8_t length)
   sendSOF();
   for (uint8_t index = 0; index < length; index++) 
   {
-#ifdef PRINT
-    Serial.println();
-#endif
     uint8_t bitc = 8;
     uint8_t thebyte = message[index];
     while (bitc--) 
     {
       if (thebyte & 0x80) { 
         sendOne();
-#ifdef PRINT
-        Serial.print("1");
-#endif
       } 
       else {
         sendZero();
-#ifdef PRINT
-        Serial.print("0");
-#endif
       }
       thebyte <<= 1;
     }
   }
   sendEOF();
-#ifdef PRINT
-  Serial.println();
-  Serial.println("-----");
-#endif
+
+  Serial.print(F(">"));
+  for (uint8_t index = 0; index < length; index++) {
+    uint8_t thebyte = message[index];
+
+    if (thebyte < 16) Serial.print("0");
+    Serial.print(thebyte, HEX);
+  }
+  Serial.println(F("<"));
+
 }
 
-uint8_t ones[] = {0xFF, 0xFF};
-uint8_t zeros[] = {0x00, 0x00};
-uint8_t message[] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0};
+uint8_t ones[] = {
+  0xFF, 0xFF};
+uint8_t zeros[] = {
+  0x00, 0x00};
+
+uint8_t rpm[] = {
+  0x28, 0x1b, 0x10, 0x02, 0x10, 0x00};
+uint8_t spd[] = {
+  0x48, 0x29, 0x10, 0x02, 0x07, 0x00};
+uint8_t gear[] = {
+  0xa8, 0x3b, 0x10, 0x03, 0x0f};
+uint8_t fuel[] = {
+  0xa8, 0x83, 0x61, 0x12, 0xd8};
+uint8_t temp[] = {
+  0xa8, 0x49, 0x10, 0x10, 0x85};
+uint8_t turnl[] = {
+  0x48, 0xda, 0x40, 0x39, 0x01};
+uint8_t turnr[] = {
+  0x48, 0xda, 0x40, 0x39, 0x02};
+
 
 
 //
@@ -138,15 +151,48 @@ uint8_t message[] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0};
 //
 void loop(void)
 {
-  delay(300);
+  delay(800);
   digitalWrite(LED_PIN, HIGH);
 
-  if (digitalRead(MES1_PIN) == LOW)
-    sendMessage(ones, sizeof(ones));  
-  if (digitalRead(MES2_PIN) == LOW)
-    sendMessage(zeros, sizeof(zeros));  
-  if (digitalRead(MES3_PIN) == LOW)
-    sendMessage(message, sizeof(message));  
+  uint8_t sel = digitalRead(MES1_PIN) == LOW ? 0x04 : 0x00;
+  sel |= digitalRead(MES2_PIN) == LOW ? 0x02 : 0x00;
+  sel |= digitalRead(MES3_PIN) == LOW ? 0x01 : 0x00;
+  switch (sel) {
+  case 0:  
+    sendMessage(zeros, sizeof(zeros)); 
+    break;
+  case 1:  
+    sendMessage(ones, sizeof(ones)); 
+    break;
+  case 2:  
+    sendMessage(rpm, sizeof(rpm)); 
+    break;
+  case 3:  
+    sendMessage(spd, sizeof(spd)); 
+    break;
+  case 4:  
+    sendMessage(gear, sizeof(gear)); 
+    break;
+  case 5:  
+    sendMessage(temp, sizeof(temp)); 
+    break;
+  case 6:  
+    break;
+  case 7:  
+    sendMessage(rpm, sizeof(rpm)); 
+    delay(50);
+    sendMessage(spd, sizeof(spd)); 
+    delay(50);
+    sendMessage(gear, sizeof(gear)); 
+    delay(50);
+    sendMessage(temp, sizeof(temp)); 
+    delay(50);
+    sendMessage(turnl, sizeof(turnl)); 
+    delay(50);
+    sendMessage(turnr, sizeof(turnr)); 
+    delay(50);
+    break;
+  }
   digitalWrite(LED_PIN, LOW);
 }
 
